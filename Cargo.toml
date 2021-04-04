@@ -2,14 +2,17 @@
 authors = [
     "MorganR <roffmorgan@gmail.com>",
 ]
-description = " A sensor communication library "
+description = "A library for communicating with common sensors and peripherals. Avoids the std library, and uses async operations where possible."
 edition = "2018"
+keywords = ["sensors", "hal", "no_std", "driver", "drivers", "dht", "dht11"]
 license = "MIT OR Apache-2.0"
-name = "sensors"
+name = "common-sensors"
 readme = "README.md"
 repository = "https://github.com/MorganR/rust-sensors"
 version = "0.1.0"
 
 [dependencies]
 embedded-hal = { path = "../embedded-hal" }
+
+[dev-dependencies]
 tokio = { version = "1.4.0", features = ["macros", "rt", "time"] }
