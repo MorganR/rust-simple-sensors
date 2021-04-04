@@ -1,5 +1,5 @@
 use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
-use common_sensors::dht11;
+use simple_sensors::dht11;
 use std::time::{Instant, Duration};
 
 #[derive(Debug)]

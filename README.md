@@ -1,8 +1,8 @@
-# rust-sensors
+# Simple Sensors (for Rust)
 
 Rust library for communicating with common sensors.
 
-Written and verified using a Raspberry Pi 3B+, but all sensors use Rust's [embedded-hal](https://github.com/rust-embedded/embedded-hal) to enable wide compatibility.
+Written and verified using a Raspberry Pi 3B+, but all sensors use the [embedded-hal](https://github.com/rust-embedded/embedded-hal) crate to enable wide compatibility.
 
 ## License
 
