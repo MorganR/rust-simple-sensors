@@ -1,93 +1,12 @@
-use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
 use simple_sensors::dht11;
 use std::time::{Instant, Duration};
 
-#[derive(Debug)]
-enum FakeError {}
-
-static mut data_index: usize = 0;
-
-struct FakePin {
-    data_to_read: Option<Vec<u8>>,
-}
-
-impl FakePin {
-    fn new() -> FakePin {
-        unsafe {
-            data_index = 0;
-        }
-        FakePin{ data_to_read: None }
-    }
-
-    fn set_data(&mut self, data: Vec<u8>) {
-        self.data_to_read = Some(data);
-        unsafe {
-            data_index = 0;
-        }
-    }
-
-    fn clear_data(&mut self) {
-        self.data_to_read = None;
-        unsafe {
-            data_index = 0;
-        }
-    }
-}
-
-impl InputPin for FakePin {
-    type Error = FakeError;
-
-    fn try_is_high(&self) -> Result<bool, Self::Error> {
-        if self.data_to_read.is_none() {
-            return Ok(false);
-        }
-
-        unsafe {
-            data_index += 1;
-            Ok(self.data_to_read.as_ref().unwrap()[data_index - 1] > 0)
-        }
-    }
-
-    fn try_is_low(&self) -> Result<bool, Self::Error> {
-        if self.data_to_read.is_none() {
-            return Ok(false);
-        }
-
-        unsafe {
-            data_index += 1;
-            Ok(self.data_to_read.as_ref().unwrap()[data_index - 1] == 0)
-        }
-    }
-}
-
-impl OutputPin for FakePin {
-    type Error = FakeError;
-
-    fn try_set_low(&mut self) -> Result<(), Self::Error> {
-        return Ok(());
-    }
-
-    fn try_set_high(&mut self) -> Result<(), Self::Error> {
-        return Ok(());
-    }
-}
-
-impl IoPin<FakePin, FakePin> for FakePin {
-    type Error = FakeError;
-
-    fn try_switch_to_input_pin(self) -> Result<FakePin, Self::Error> {
-        Ok(self)
-    }
-
-    fn try_switch_to_output_pin(self, _state: PinState) -> Result<FakePin, Self::Error> {
-        Ok(self)
-    }
-}
+mod fake_hal;
 
 #[tokio::test]
-async fn test_set_invalid_interval() -> Result<(), dht11::Error<FakeError>> {
+async fn test_set_invalid_interval() -> Result<(), dht11::Error<fake_hal::Error>> {
     let mut sensor = dht11::Dht11::new(
-        FakePin::new(),
+        fake_hal::Pin::new("invalid-interval"),
         || Instant::now(),
         |instant| instant.elapsed())?;
 
@@ -96,9 +15,9 @@ async fn test_set_invalid_interval() -> Result<(), dht11::Error<FakeError>> {
 }
 
 #[tokio::test]
-async fn test_read_all_zeros() -> Result<(), dht11::Error<FakeError>> {
+async fn test_read_all_zeros() -> Result<(), dht11::Error<fake_hal::Error>> {
     let mut sensor = dht11::Dht11::new(
-        FakePin::new(),
+        fake_hal::Pin::new("all-zeros"),
         || Instant::now(),
         |instant| instant.elapsed())?;
 
@@ -108,8 +27,8 @@ async fn test_read_all_zeros() -> Result<(), dht11::Error<FakeError>> {
 }
 
 #[tokio::test]
-async fn test_read_with_valid_data() -> Result<(), dht11::Error<FakeError>> {
-    let mut fake_pin = FakePin::new();
+async fn test_read_with_valid_data() -> Result<(), dht11::Error<fake_hal::Error>> {
+    let mut fake_pin = fake_hal::Pin::new("invalid-data");
     fake_pin.set_data(vec![
         /* ACK */
         1,1,0,0,1,1,
@@ -136,8 +55,8 @@ async fn test_read_with_valid_data() -> Result<(), dht11::Error<FakeError>> {
 }
 
 #[tokio::test]
-async fn test_read_bad_parity() -> Result<(), dht11::Error<FakeError>> {
-    let mut fake_pin = FakePin::new();
+async fn test_read_bad_parity() -> Result<(), dht11::Error<fake_hal::Error>> {
+    let mut fake_pin = fake_hal::Pin::new("bad-parity");
     fake_pin.set_data(vec![
         /* ACK */
         1,1,0,0,1,1,
@@ -167,8 +86,8 @@ async fn test_read_bad_parity() -> Result<(), dht11::Error<FakeError>> {
 }
 
 #[tokio::test]
-async fn test_read_with_imperfect_timing() -> Result<(), dht11::Error<FakeError>> {
-    let mut fake_pin = FakePin::new();
+async fn test_read_with_imperfect_timing() -> Result<(), dht11::Error<fake_hal::Error>> {
+    let mut fake_pin = fake_hal::Pin::new("imperfect-timing");
     fake_pin.set_data(vec![
         /* ACK */
         1,1,0,0,1,1,
@@ -195,8 +114,8 @@ async fn test_read_with_imperfect_timing() -> Result<(), dht11::Error<FakeError>
 }
 
 #[tokio::test]
-async fn test_read_with_timeout() -> Result<(), dht11::Error<FakeError>> {
-    let mut fake_pin = FakePin::new();
+async fn test_read_with_timeout() -> Result<(), dht11::Error<fake_hal::Error>> {
+    let mut fake_pin = fake_hal::Pin::new("timeout");
     fake_pin.set_data(vec![
         /* ACK */
         1,1,0,0,1,1,
