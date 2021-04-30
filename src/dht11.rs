@@ -1,5 +1,5 @@
-use embedded_hal::digital::{InputPin, OutputPin, IoPin, PinState};
 use core::time::Duration;
+use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
 
 #[derive(Debug)]
 pub enum Error<TIoError> {
@@ -38,10 +38,12 @@ impl DhtResponse {
     }
 }
 
-pub struct Dht11<TInputPin, TOutputPin, TimeFn, ElapsedFn, TTime> 
-where TimeFn: Fn() -> TTime,
-      ElapsedFn: Fn(TTime) -> Duration,
-      TTime: Copy {
+pub struct Dht11<TInputPin, TOutputPin, TimeFn, ElapsedFn, TTime>
+where
+    TimeFn: Fn() -> TTime,
+    ElapsedFn: Fn(TTime) -> Duration,
+    TTime: Copy,
+{
     input_pin: Option<TInputPin>,
     output_pin: Option<TOutputPin>,
     minimum_read_interval: Duration,
@@ -52,16 +54,18 @@ where TimeFn: Fn() -> TTime,
 
 pub const MINIMUM_READ_INTERVAL: Duration = Duration::from_millis(1000);
 
-impl<TInputPin, TOutputPin, TError, TimeFn, ElapsedFn, TTime> Dht11<TInputPin, TOutputPin, TimeFn, ElapsedFn, TTime>
-where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error = TError>,
-      TOutputPin : OutputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error = TError>,
-      TimeFn: Fn() -> TTime,
-      ElapsedFn: Fn(TTime) -> Duration,
-      TTime: Copy {
-
+impl<TInputPin, TOutputPin, TError, TimeFn, ElapsedFn, TTime>
+    Dht11<TInputPin, TOutputPin, TimeFn, ElapsedFn, TTime>
+where
+    TInputPin: InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error = TError>,
+    TOutputPin: OutputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error = TError>,
+    TimeFn: Fn() -> TTime,
+    ElapsedFn: Fn(TTime) -> Duration,
+    TTime: Copy,
+{
     /// Constructs a DHT sensor that reads from the given pin and uses the
     /// default minimum read interval (1 second).
-    /// 
+    ///
     /// Reads can sometimes be more reliable with a longer delay, eg. 2 seconds,
     /// so consider calling
     /// [`set_minimum_read_interval`](method@crate::dht11::Dht11::set_minimum_read_interval)
@@ -72,12 +76,14 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
     /// much time has passed since then. It does not need to reflect real
     /// dates and times, but only needs to be capable of providing reasonably
     /// accurate durations (i.e. with millisecond precision or better).
-    pub fn new<TIoPin>(pin: TIoPin, time_fn: TimeFn, elapsed_since_fn: ElapsedFn)
-            -> Result<Dht11<TInputPin, TOutputPin, TimeFn, ElapsedFn, TTime>, Error<TError>> 
-            where TIoPin : IoPin<TInputPin, TOutputPin, Error = TError> {
+    pub fn new(
+        pin: TOutputPin,
+        time_fn: TimeFn,
+        elapsed_since_fn: ElapsedFn,
+    ) -> Result<Dht11<TInputPin, TOutputPin, TimeFn, ElapsedFn, TTime>, Error<TError>> {
         Ok(Dht11 {
             input_pin: None,
-            output_pin: Some(pin.try_switch_to_output_pin(PinState::High)?),
+            output_pin: Some(pin),
             minimum_read_interval: MINIMUM_READ_INTERVAL,
             last_read_time: time_fn(),
             time_fn: time_fn,
@@ -87,7 +93,10 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
 
     /// Modifies the minimum read interval enforced by this sensor. This must
     /// be greater than the DHT's default minimum read interval of 1 second.
-    pub fn set_minimum_read_interval(&mut self, read_interval: Duration) -> Result<(), Error<TError>> {
+    pub fn set_minimum_read_interval(
+        &mut self,
+        read_interval: Duration,
+    ) -> Result<(), Error<TError>> {
         if read_interval < MINIMUM_READ_INTERVAL {
             return Err(Error::InvalidArgument());
         }
@@ -96,19 +105,24 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
         Ok(())
     }
 
-    /// Reads data from the DHT sensor using the minimum read interval. 
-    /// 
+    /// Reads data from the DHT sensor using the minimum read interval.
+    ///
     /// This will asynchronously sleep using the provided `delay_fn` if `read`
     /// is called within the minimum read interval of this DHT sensor. The
     /// provided function needs to be capable of millisecond precision or
     /// better.
-    /// 
+    ///
     /// Due to the tight timing necessary to distinguish bits in the DHT's
     /// response, this performs blocking I/O reads while receiving data. This
     /// takes about 4ms (full range: 3200-4800us, depending on the data).
-    pub async fn read<DelayFn, EmptyFuture>(&mut self, delay_fn: DelayFn) -> Result<DhtResponse, Error<TError>> 
-    where DelayFn: Fn(Duration) -> EmptyFuture,
-          EmptyFuture: core::future::Future<Output = ()> {
+    pub async fn read<DelayFn, EmptyFuture>(
+        &mut self,
+        delay_fn: DelayFn,
+    ) -> Result<DhtResponse, Error<TError>>
+    where
+        DelayFn: Fn(Duration) -> EmptyFuture,
+        EmptyFuture: core::future::Future<Output = ()>,
+    {
         // Double check that the output is driven high so the DHT is ready to send data.
         if self.output_pin.is_none() {
             self.swap_to_output_mode()?;
@@ -125,17 +139,32 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
         Ok(DhtResponse::from_raw_bytes(&bytes))
     }
 
-    async fn request_data<DelayFn, EmptyFuture>(&mut self, delay_fn: DelayFn) -> Result<(), Error<TError>> 
-    where DelayFn: Fn(Duration) -> EmptyFuture,
-          EmptyFuture: core::future::Future<Output = ()> {
-        self.output_pin.as_mut().unwrap().try_set_low().map_err(|err| Error::Wrapped(err))?;
+    async fn request_data<DelayFn, EmptyFuture>(
+        &mut self,
+        delay_fn: DelayFn,
+    ) -> Result<(), Error<TError>>
+    where
+        DelayFn: Fn(Duration) -> EmptyFuture,
+        EmptyFuture: core::future::Future<Output = ()>,
+    {
+        self.output_pin
+            .as_mut()
+            .unwrap()
+            .try_set_low()
+            .map_err(|err| Error::Wrapped(err))?;
         delay_fn(Duration::from_millis(18)).await;
         Ok(())
     }
 
     fn receive_data(&mut self) -> Result<[u8; 4], Error<TError>> {
         let mut bit_ticks = [0u32; 40];
-        self.input_pin = Some(self.output_pin.take().unwrap().try_switch_to_input_pin().map_err(|err| Error::Wrapped(err))?);
+        self.input_pin = Some(
+            self.output_pin
+                .take()
+                .unwrap()
+                .try_into_input_pin()
+                .map_err(|err| Error::Wrapped(err))?,
+        );
         let input_pin: &TInputPin = &mut self.input_pin.as_ref().unwrap();
 
         // Block for the ACK, and use this to estimate a timeout.
@@ -143,8 +172,8 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
             Err(err) => {
                 self.swap_to_output_mode()?;
                 return Err(err);
-            },
-            Ok(count) => count
+            }
+            Ok(count) => count,
         };
         let bit_timeout = ack_counter << 2;
 
@@ -154,7 +183,7 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
                     self.swap_to_output_mode()?;
                     return Err(err);
                 }
-                Ok(count) => count
+                Ok(count) => count,
             };
         }
 
@@ -171,7 +200,8 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
         let low_temp = parse_byte(&bit_ticks[24..32], threshold) & 0b1111u8;
         let parity = parse_byte(&bit_ticks[32..40], threshold);
 
-        let sum: u16 = high_humidity as u16 + low_humidity as u16 + high_temp as u16 + low_temp as u16;
+        let sum: u16 =
+            high_humidity as u16 + low_humidity as u16 + high_temp as u16 + low_temp as u16;
         // The last 8 bits should match the parity byte.
         let expected_parity = sum.to_be_bytes()[1];
 
@@ -184,9 +214,12 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
 
     fn swap_to_output_mode(&mut self) -> Result<(), Error<TError>> {
         self.output_pin = Some(
-            self.input_pin.take().unwrap()
-                .try_switch_to_output_pin(PinState::High)
-                .map_err(|err| Error::Wrapped(err))?);
+            self.input_pin
+                .take()
+                .unwrap()
+                .try_into_output_pin(PinState::High)
+                .map_err(|err| Error::Wrapped(err))?,
+        );
         self.last_read_time = (self.time_fn)();
         Ok(())
     }
@@ -194,35 +227,47 @@ where TInputPin : InputPin<Error = TError> + IoPin<TInputPin, TOutputPin, Error 
 
 #[inline]
 fn read_bit_with_timeout<TInput, TError>(
-    input_pin: &TInput, timeout: u32) -> Result<u32, Error<TError>>
-where TInput: InputPin<Error = TError> {
+    input_pin: &TInput,
+    timeout: u32,
+) -> Result<u32, Error<TError>>
+where
+    TInput: InputPin<Error = TError>,
+{
     let mut counter = 0u32;
     while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
             return Err(Error::Timeout());
         }
-    };
+    }
     while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
             return Err(Error::Timeout());
         }
-    };
+    }
     Ok(counter)
 }
 
 #[inline]
 fn read_ack<TInput, TError>(input_pin: &TInput) -> Result<u32, Error<TError>>
-where TInput: InputPin<Error = TError> {
+where
+    TInput: InputPin<Error = TError>,
+{
     let mut counter: u32 = 0;
-    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? { counter += 1; };
-    while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? { counter += 1; };
-    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? { counter += 1; };
+    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
+        counter += 1;
+    }
+    while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
+        counter += 1;
+    }
+    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
+        counter += 1;
+    }
     Ok(counter)
 }
 
-// (index, count) 
+// (index, count)
 #[derive(Clone, Copy)]
 struct Peak(i8, u8);
 

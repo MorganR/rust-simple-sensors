@@ -12,16 +12,14 @@ pub struct Pin {
 impl Pin {
     pub fn new(name: &'static str) -> Pin {
         concurrent::set_named_value(name, 0);
-        Pin{ data_to_read: None, name: name }
+        Pin {
+            data_to_read: None,
+            name: name,
+        }
     }
 
     pub fn set_data(&mut self, data: Vec<u8>) {
         self.data_to_read = Some(data);
-        concurrent::set_named_value(&self.name, 0);
-    }
-
-    pub fn clear_data(&mut self) {
-        self.data_to_read = None;
         concurrent::set_named_value(&self.name, 0);
     }
 }
@@ -63,11 +61,11 @@ impl OutputPin for Pin {
 impl IoPin<Pin, Pin> for Pin {
     type Error = Error;
 
-    fn try_switch_to_input_pin(self) -> Result<Pin, Self::Error> {
+    fn try_into_input_pin(self) -> Result<Pin, Self::Error> {
         Ok(self)
     }
 
-    fn try_switch_to_output_pin(self, _state: PinState) -> Result<Pin, Self::Error> {
+    fn try_into_output_pin(self, _state: PinState) -> Result<Pin, Self::Error> {
         Ok(self)
     }
 }
