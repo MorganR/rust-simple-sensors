@@ -25,7 +25,7 @@ macro_rules! test_synchronous_read_success {
 
             let result = $read_fn($request, &mut spi)?;
 
-            assert_eq!(result, mcp300x::Response(0x1F1));
+            assert_eq!(result, 0x1F1);
             Ok(())
         }
     };
@@ -89,7 +89,7 @@ fn read_ignores_noise() -> Result<(), mcp300x::Error<fake_spi::SpiError>> {
 
     let result = mcp300x::read_mcp3008(mcp300x::Request::SingleEnded(0), &mut spi)?;
 
-    assert_eq!(result, mcp300x::Response(0x344));
+    assert_eq!(result, 0x344);
     Ok(())
 }
 
@@ -158,7 +158,7 @@ fn asynchronous_writes_succeed() -> Result<(), mcp300x::Error<fake_spi::SpiError
         &mut spi,
     )?;
 
-    assert_eq!(result, mcp300x::Response(0xF0));
+    assert_eq!(result, 0xF0);
     assert_eq!(spi.get_written_data(), [0x1, 0x10, 0x0]);
     Ok(())
 }

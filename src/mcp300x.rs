@@ -1,9 +1,9 @@
 use embedded_hal::blocking::spi::Transfer;
 
 /// The maximum SPI clock speed when V<sub>DD</sub> is 5V.
-pub const MAX_CLK_AT_5V: u32 = 3_600_000;
+pub const MAX_CLOCK_AT_5V: u32 = 3_600_000;
 /// The maximum SPI clock speed when V<sub>DD</sub> is 2.7V.
-pub const MAX_CLK_AT_2_7V: u32 = 1_350_000;
+pub const MAX_CLOCK_AT_2_7V: u32 = 1_350_000;
 
 // The number of addressable channels on an MCP3004.
 pub const NUM_CHANNELS_MCP3004: u8 = 4;
@@ -58,8 +58,8 @@ pub enum Request {
     /// Output = 1024 * (V<sub>channel</sub> - V<sub>analog ground</sub>) /
     /// (V<sub>ref</sub> - V<sub>analog ground</sub>)
     ///
-    /// The given channel must be in the inclusive range [0,4] for an MCP3004 or
-    /// [0,7] for an MCP3008.
+    /// The given channel must be in the inclusive range \[0,4\] for an MCP3004 or \[0,7\] for an
+    /// MCP3008.
     SingleEnded(u8),
     /// Read the voltage of each differential input pair as compared to the voltage between analogue
     /// ground (V<sub>analog ground</sub>) and the reference voltage (V<sub>ref</sub>).
@@ -93,23 +93,6 @@ impl Request {
     }
 }
 
-/// The value read from the device.
-///
-/// The response is in the range [0, 1023]. What this means depends on the request:
-///
-/// * `SingleEnded`: 1024 * (V<sub>channel</sub> - V<sub>analog ground</sub>) /
-///   (V<sub>ref</sub> - V<sub>analog ground</sub>)
-/// * `Differential`: 1024 * (V<sub>channel a</sub> - V<sub>channel b</sub>) /
-///   (V<sub>ref</sub> - V<sub>analog ground</sub>)
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Response(pub u16);
-
-impl core::convert::From<u16> for Response {
-    fn from(value: u16) -> Self {
-        Response(value)
-    }
-}
-
 macro_rules! mcp_300x_impl {
     ($name:ident, $is_arg_invalid:expr) => {
         /// Reads the requested data from the device.
@@ -118,23 +101,30 @@ macro_rules! mcp_300x_impl {
         /// device. This means:
         ///
         /// * Use 8 bits per word.
-        /// * Depending on V_DD, the maximum possible clock speed is:
-        ///   * *2.7V*: 1.35MHz (MAX_CLOCK_AT_2_7V)
-        ///   * *5V*: 3.6MHz (MAX_CLOCK_AT_5V)
+        /// * Depending on V<sub>DD</sub>, the maximum possible clock speed is:
+        ///   * *2.7V*: 1.35MHz ([`MAX_CLOCK_AT_2_7V`])
+        ///   * *5V*: 3.6MHz ([`MAX_CLOCK_AT_5V`])
         /// * Data is sent most-significant-bit first
         /// * SPI mode: 0 (i.e. idle low, capture on first transition)
         /// * Chip select is performed automatically by the SPI driver, or manually around this
         ///   function call.
         ///
-        /// This returns `Error::InvalidArgument` if the request is not possible for this device
+        /// This returns [`Error::InvalidArgument`] if the request is not possible for this device
         /// type. See [`Request`] for more details.
+        ///
+        /// A valid response is in the range \[0, 1023\]. What this means depends on the request:
+        ///
+        /// * `SingleEnded`: 1024 * (V<sub>channel</sub> - V<sub>analog ground</sub>) /
+        ///   (V<sub>ref</sub> - V<sub>analog ground</sub>)
+        /// * `Differential`: 1024 * (V<sub>channel a</sub> - V<sub>channel b</sub>) /
+        ///   (V<sub>ref</sub> - V<sub>analog ground</sub>)
         ///
         /// Refer to [this datasheet](https://cdn-shop.adafruit.com/datasheets/MCP3008.pdf) for more
         /// information about these devices.
         pub fn $name<TSpi, TIoError>(
             request: Request,
             spi: &mut TSpi,
-        ) -> Result<Response, Error<TIoError>>
+        ) -> Result<u16, Error<TIoError>>
         where
             TSpi: Transfer<u8, Error = TIoError>,
         {
@@ -155,7 +145,7 @@ mcp_300x_impl!(read_mcp3008, |request| match request {
     _ => false,
 });
 
-fn read<TSpi, TIoError>(request: Request, spi: &mut TSpi) -> Result<Response, Error<TIoError>>
+fn read<TSpi, TIoError>(request: Request, spi: &mut TSpi) -> Result<u16, Error<TIoError>>
 where
     TSpi: Transfer<u8, Error = TIoError>,
 {
@@ -175,7 +165,7 @@ where
         return Err(Error::BadData);
     }
 
-    Ok(Response((((rx[1] & 0b11) as u16) << 8) + rx[2] as u16))
+    Ok((((rx[1] & 0b11) as u16) << 8) + rx[2] as u16)
 }
 
 #[cfg(test)]
