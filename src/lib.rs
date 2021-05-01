@@ -1,8 +1,8 @@
 #![no_std]
 
-/// A universal driver for reading from a DHT11 sensor.
-pub mod dht11;
-/// Provides universal utilities for reading data from MCP300x series analog-to-digital converters.
+/// Universal drivers for reading from DHT11 or DHT22 sensors.
+pub mod dhtxx;
+/// Universal utilities for reading data from MCP300x series analog-to-digital converters.
 ///
 /// Refer to [this datasheet](https://cdn-shop.adafruit.com/datasheets/MCP3008.pdf) for more
 /// information about these devices.

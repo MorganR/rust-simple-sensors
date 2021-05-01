@@ -4,6 +4,7 @@ use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
 #[derive(Debug, PartialEq)]
 pub enum Error {}
 
+#[derive(Debug)]
 pub struct Pin {
     data_to_read: Option<Vec<u8>>,
     name: &'static str,
