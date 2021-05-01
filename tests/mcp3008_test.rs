@@ -6,8 +6,8 @@ use fake_hal::spi as fake_spi;
 
 impl DefaultTransfer<u8> for fake_spi::SPI {}
 
-#[tokio::test]
-async fn read_synchronous() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
+#[test]
+fn read_synchronous() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
     let mut spi = fake_spi::SPI::new(
         vec![
             fake_spi::FakeRead::Success(0),
@@ -28,8 +28,8 @@ async fn read_synchronous() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
     Ok(())
 }
 
-#[tokio::test]
-async fn expected_request_sent() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
+#[test]
+fn expected_request_sent() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
     let mut spi = fake_spi::SPI::new(
         vec![
             fake_spi::FakeRead::Success(0),
@@ -50,8 +50,8 @@ async fn expected_request_sent() -> Result<(), mcp3008::Error<fake_spi::SpiError
     Ok(())
 }
 
-#[tokio::test]
-async fn asynchronous_writes_succeed() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
+#[test]
+fn asynchronous_writes_succeed() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
     let mut spi = fake_spi::SPI::new(
         vec![
             fake_spi::FakeRead::Success(0),
@@ -75,8 +75,8 @@ async fn asynchronous_writes_succeed() -> Result<(), mcp3008::Error<fake_spi::Sp
     Ok(())
 }
 
-#[tokio::test]
-async fn read_invalid_channel_fails() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
+#[test]
+fn read_invalid_channel_fails() -> Result<(), mcp3008::Error<fake_spi::SpiError>> {
     let mut spi = fake_spi::SPI::new(
         vec![
             fake_spi::FakeRead::Success(0),
