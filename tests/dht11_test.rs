@@ -2,25 +2,29 @@ use simple_sensors::dht11;
 use std::time::{Duration, Instant};
 
 mod fake_hal;
+use fake_hal::digital as fake_digital;
 
 #[tokio::test]
-async fn test_set_invalid_interval() -> Result<(), dht11::Error<fake_hal::Error>> {
+async fn set_invalid_interval_fails() -> Result<(), dht11::Error<fake_digital::Error>> {
     let mut sensor = dht11::Dht11::new(
-        fake_hal::Pin::new("invalid-interval"),
+        fake_digital::Pin::new("invalid-interval"),
         || Instant::now(),
         |instant| instant.elapsed(),
     )?;
 
-    assert!(!sensor
-        .set_minimum_read_interval(Duration::from_nanos(1))
-        .is_ok());
+    let result = sensor.set_minimum_read_interval(Duration::from_nanos(1));
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        dht11::Error::InvalidArgument::<fake_digital::Error>
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn test_read_all_zeros() -> Result<(), dht11::Error<fake_hal::Error>> {
+async fn read_all_zeros_succeeds() -> Result<(), dht11::Error<fake_digital::Error>> {
     let mut sensor = dht11::Dht11::new(
-        fake_hal::Pin::new("all-zeros"),
+        fake_digital::Pin::new("all-zeros"),
         || Instant::now(),
         |instant| instant.elapsed(),
     )?;
@@ -41,8 +45,8 @@ async fn test_read_all_zeros() -> Result<(), dht11::Error<fake_hal::Error>> {
 }
 
 #[tokio::test]
-async fn test_read_with_valid_data() -> Result<(), dht11::Error<fake_hal::Error>> {
-    let mut fake_pin = fake_hal::Pin::new("invalid-data");
+async fn read_with_valid_data() -> Result<(), dht11::Error<fake_digital::Error>> {
+    let mut fake_pin = fake_digital::Pin::new("invalid-data");
     fake_pin.set_data(vec![
         /* ACK */
         1, 1, 0, 0, 1, 1, /* Byte 0 = 0x11 */
@@ -76,8 +80,8 @@ async fn test_read_with_valid_data() -> Result<(), dht11::Error<fake_hal::Error>
 }
 
 #[tokio::test]
-async fn test_read_bad_parity() -> Result<(), dht11::Error<fake_hal::Error>> {
-    let mut fake_pin = fake_hal::Pin::new("bad-parity");
+async fn read_bad_parity_fails() -> Result<(), dht11::Error<fake_digital::Error>> {
+    let mut fake_pin = fake_digital::Pin::new("bad-parity");
     fake_pin.set_data(vec![
         /* ACK */
         1, 1, 0, 0, 1, 1, /* Byte 0 = 0x11 */
@@ -98,16 +102,17 @@ async fn test_read_bad_parity() -> Result<(), dht11::Error<fake_hal::Error>> {
     let result = sensor
         .read(|duration| tokio::time::sleep(duration.into()))
         .await;
-    assert!(match result {
-        Err(dht11::Error::BadParity()) => true,
-        _ => false,
-    });
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        dht11::Error::BadParity::<fake_digital::Error>
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn test_read_with_imperfect_timing() -> Result<(), dht11::Error<fake_hal::Error>> {
-    let mut fake_pin = fake_hal::Pin::new("imperfect-timing");
+async fn read_with_imperfect_timing_succeeds() -> Result<(), dht11::Error<fake_digital::Error>> {
+    let mut fake_pin = fake_digital::Pin::new("imperfect-timing");
     fake_pin.set_data(vec![
         /* ACK */
         1, 1, 0, 0, 1, 1, /* Byte 0 = 0x11 */
@@ -142,8 +147,8 @@ async fn test_read_with_imperfect_timing() -> Result<(), dht11::Error<fake_hal::
 }
 
 #[tokio::test]
-async fn test_read_with_timeout() -> Result<(), dht11::Error<fake_hal::Error>> {
-    let mut fake_pin = fake_hal::Pin::new("timeout");
+async fn read_with_timeout_fails() -> Result<(), dht11::Error<fake_digital::Error>> {
+    let mut fake_pin = fake_digital::Pin::new("timeout");
     fake_pin.set_data(vec![
         /* ACK */
         1, 1, 0, 0, 1, 1, /* Byte 0 = 0x11 */
@@ -157,9 +162,10 @@ async fn test_read_with_timeout() -> Result<(), dht11::Error<fake_hal::Error>> {
     let result = sensor
         .read(|duration| tokio::time::sleep(duration.into()))
         .await;
-    assert!(match result {
-        Err(dht11::Error::Timeout()) => true,
-        _ => false,
-    });
+    assert!(result.is_err());
+    assert_eq!(
+        result.unwrap_err(),
+        dht11::Error::Timeout::<fake_digital::Error>
+    );
     Ok(())
 }

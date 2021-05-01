@@ -1,16 +1,16 @@
 use core::time::Duration;
 use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error<TIoError> {
     /// Wrapped error from the HAL.
     Wrapped(TIoError),
     /// Invalid argument was provided.
-    InvalidArgument(),
+    InvalidArgument,
     /// Invalid data was read.
-    BadParity(),
+    BadParity,
     /// Timeout occurred.
-    Timeout(),
+    Timeout,
 }
 
 impl<TIoError> From<TIoError> for Error<TIoError> {
@@ -98,7 +98,7 @@ where
         read_interval: Duration,
     ) -> Result<(), Error<TError>> {
         if read_interval < MINIMUM_READ_INTERVAL {
-            return Err(Error::InvalidArgument());
+            return Err(Error::InvalidArgument);
         }
 
         self.minimum_read_interval = read_interval;
@@ -206,7 +206,7 @@ where
         let expected_parity = sum.to_be_bytes()[1];
 
         if parity != expected_parity {
-            return Err(Error::BadParity());
+            return Err(Error::BadParity);
         }
 
         Ok([high_humidity, low_humidity, high_temp, low_temp])
@@ -237,13 +237,13 @@ where
     while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
-            return Err(Error::Timeout());
+            return Err(Error::Timeout);
         }
     }
     while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
-            return Err(Error::Timeout());
+            return Err(Error::Timeout);
         }
     }
     Ok(counter)
