@@ -1,5 +1,4 @@
-use embedded_hal::spi::FullDuplex;
-use nb;
+use embedded_hal::blocking::spi::Transfer;
 
 /// The maximum SPI clock speed when V_DD is 5V.
 pub const MAX_CLK_AT_5V: u32 = 3_600_000;
@@ -93,14 +92,14 @@ pub struct Mcp3008Response(pub u16);
 /// A driver for reading values from an MCP3008 analog-to-digital converter.
 pub struct Mcp3008<'spi, TSpi, TIoError>
 where
-    TSpi: FullDuplex<u8, Error = TIoError>,
+    TSpi: Transfer<u8, Error = TIoError>,
 {
     spi: &'spi mut TSpi,
 }
 
 impl<'spi, TSpi, TIoError> Mcp3008<'spi, TSpi, TIoError>
 where
-    TSpi: FullDuplex<u8, Error = TIoError>,
+    TSpi: Transfer<u8, Error = TIoError>,
 {
     /// Constructs an MCP3008 driver.
     ///
@@ -137,16 +136,10 @@ where
         //   1 - start bit
         //   1/0 - single-ended/differential read
         //   X X X - channel select bits
-        let tx_buf: [u8; 3] = [0x1, request.to_bits() << 4, 0x0];
-        let mut rx_buf: [u8; 3] = [0; 3];
-        for (i, tx_word) in tx_buf.iter().enumerate() {
-            nb::block!(self.spi.try_send(*tx_word))?;
-            rx_buf[i] = nb::block!(self.spi.try_read())?;
-        }
+        let mut tx_buf: [u8; 3] = [0x1, request.to_bits() << 4, 0x0];
+        let rx = self.spi.try_transfer(&mut tx_buf)?;
 
-        Ok(Mcp3008Response(
-            (((rx_buf[1] & 3) as u16) << 8) + rx_buf[2] as u16,
-        ))
+        Ok(Mcp3008Response((((rx[1] & 3) as u16) << 8) + rx[2] as u16))
     }
 }
 
