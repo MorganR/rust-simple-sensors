@@ -8,6 +8,7 @@ pub enum Error {}
 pub struct Pin {
     data_to_read: Option<Vec<u8>>,
     name: &'static str,
+    default_data: bool,
 }
 
 impl Pin {
@@ -16,7 +17,13 @@ impl Pin {
         Pin {
             data_to_read: None,
             name: name,
+            default_data: false,
         }
+    }
+
+    pub fn set_default_data(&mut self, default: bool) {
+        self.default_data = default;
+        self.data_to_read = None;
     }
 
     pub fn set_data(&mut self, data: Vec<u8>) {
@@ -30,7 +37,7 @@ impl InputPin for Pin {
 
     fn try_is_high(&self) -> Result<bool, Self::Error> {
         if self.data_to_read.is_none() {
-            return Ok(false);
+            return Ok(self.default_data);
         }
 
         let data_index = concurrent::get_and_increment_named_value(&self.name);
@@ -39,7 +46,7 @@ impl InputPin for Pin {
 
     fn try_is_low(&self) -> Result<bool, Self::Error> {
         if self.data_to_read.is_none() {
-            return Ok(false);
+            return Ok(!self.default_data);
         }
 
         let data_index = concurrent::get_and_increment_named_value(&self.name);

@@ -7,10 +7,10 @@ pub enum Error<TIoError> {
     Wrapped(TIoError),
     /// Invalid argument was provided.
     InvalidArgument,
-    /// Invalid data was read.
+    /// Invalid data was read for all attempts.
     BadData,
-    /// Timeout occurred.
-    Timeout,
+    /// No response was received.
+    NoResponse,
 }
 
 impl<TIoError> From<TIoError> for Error<TIoError> {
@@ -111,43 +111,43 @@ impl ResponseInternal for Dht22Response {
 ///
 /// Note that this can vary a bit by device, so check your device's datasheet to be sure. Try
 /// doubling this value if you are encountering problems.
-pub const MINIMUM_DHT11_READ_INTERVAL: Duration = Duration::from_millis(1000);
+pub const MIN_DHT11_READ_INTERVAL: Duration = Duration::from_millis(1000);
 
 /// The minimum read interval of a DHT22.
 ///
 /// Note that this can vary a bit by device, so check your device's datasheet to be sure. Try
 /// doubling this value if you are encountering problems.
-pub const MINIMUM_DHT22_READ_INTERVAL: Duration = Duration::from_millis(2000);
+pub const MIN_DHT22_READ_INTERVAL: Duration = Duration::from_millis(2000);
 
 /// Options to modify the behavior of the DHT driver.
 #[derive(Clone, Copy, Debug)]
 pub struct Options {
     /// The minimum time interval that must pass between reads. Cannot be below this sensor's
-    /// absolute minimum read interval (i.e. [`MINIMUM_DHT11_READ_INTERVAL`] or
-    /// [`MINIMUM_DHT22_READ_INTERVAL`])
-    pub minimum_read_interval: Duration,
+    /// absolute minimum read interval (i.e. [`MIN_DHT11_READ_INTERVAL`] or
+    /// [`MIN_DHT22_READ_INTERVAL`])
+    pub min_read_interval: Duration,
     /// The maximum number of read attempts for any call to `Dht11::read` or `Dht22::read`.
     ///
-    /// Keep in mind the `minimum_read_interval` when setting this option. For example, if the
-    /// `minimum_read_interval` is set to 2 seconds, and this is set to 3 attempts, each read
+    /// Keep in mind the `min_read_interval` when setting this option. For example, if the
+    /// `min_read_interval` is set to 2 seconds, and this is set to 3 attempts, each read
     /// could take over 6 seconds.
-    pub maximum_attempts: u8,
+    pub max_attempts: u8,
 }
 
 pub const DEFAULT_DHT11_OPTIONS: Options = Options {
-    minimum_read_interval: MINIMUM_DHT11_READ_INTERVAL,
-    maximum_attempts: 1,
+    min_read_interval: MIN_DHT11_READ_INTERVAL,
+    max_attempts: 1,
 };
 
 pub const DEFAULT_DHT22_OPTIONS: Options = Options {
-    minimum_read_interval: MINIMUM_DHT22_READ_INTERVAL,
-    maximum_attempts: 1,
+    min_read_interval: MIN_DHT22_READ_INTERVAL,
+    max_attempts: 1,
 };
 
 macro_rules! dhtxx_impl {
     ($name:ident,
      default_options: $default_options:expr,
-     minimum_read_interval: $minimum_read_interval:expr,
+     min_read_interval: $min_read_interval:expr,
      ping_duration: $ping_duration:expr,
      response_type: $response_type:ty
     ) => {
@@ -173,10 +173,16 @@ macro_rules! dhtxx_impl {
         {
             /// Constructs a DHT sensor that reads from the given pin.
             ///
-            /// Reads can sometimes be more reliable with a longer delay, eg. 2 seconds, so consider setting
-            /// the `options` value with a longer minimum read interval if error rates are high. If options
-            /// is `None`, then the default options is used (see [`DEFAULT_DHT11_OPTIONS`] or
-            /// [`DEFAULT_DHT22_OPTIONS]`).
+            /// Reads can sometimes be more reliable with a longer delay, eg. 2 seconds, so consider
+            /// setting the `options` value with a longer minimum read interval if error rates are
+            /// high. If options is `None`, then the default options is used (see
+            /// [`DEFAULT_DHT11_OPTIONS`] or [`DEFAULT_DHT22_OPTIONS]`).
+            ///
+            /// Setting [`Options::max_attempts`] to a value greater than 1 will enable this
+            /// function to seamlessly retry [`Error::BadData`] errors. Note that any
+            /// [`Error::NoResponse`] errors will be returned immediately. Keep in mind that the
+            /// minimum read interval must pass between each attempt, so each attempt adds
+            /// significantly to the duration of this function.
             ///
             /// The provided `time_fn` closure should provide some representation of a given instant that
             /// can be used with `elapsed_since_fn` to determine how much time has passed since then. It
@@ -194,8 +200,8 @@ macro_rules! dhtxx_impl {
                         $default_options
                     } else {
                         let options = options.unwrap();
-                        if options.minimum_read_interval < $minimum_read_interval
-                            || options.maximum_attempts < 1
+                        if options.min_read_interval < $min_read_interval
+                            || options.max_attempts < 1
                         {
                             return Err(Error::InvalidArgument);
                         }
@@ -218,16 +224,30 @@ macro_rules! dhtxx_impl {
                 delay_fn: DelayFn,
             ) -> Result<$response_type, Error<TError>>
             where
-                DelayFn: Fn(Duration) -> EmptyFuture,
+                DelayFn: Copy + Fn(Duration) -> EmptyFuture,
                 EmptyFuture: core::future::Future<Output = ()>,
             {
-                self.base
-                    .read::<DelayFn, EmptyFuture, $response_type>(
-                        $ping_duration,
-                        self.options.minimum_read_interval,
-                        delay_fn,
-                    )
-                    .await
+                let mut last_result: Option<Result<$response_type, Error<TError>>> = None;
+                for _ in 0..self.options.max_attempts {
+                    last_result = Some(
+                        self.base
+                            .read::<DelayFn, EmptyFuture, $response_type>(
+                                $ping_duration,
+                                self.options.min_read_interval,
+                                delay_fn,
+                            )
+                            .await,
+                    );
+                    match last_result.as_ref().unwrap() {
+                        &Ok(_) => return last_result.unwrap(),
+                        &Err(Error::NoResponse::<TError>) => return last_result.unwrap(),
+                        _ => {}
+                    };
+                }
+                if let Some(final_result) = last_result {
+                    return final_result;
+                }
+                panic!("DHT had no response after all attempts. This should not be possible.");
             }
         }
     };
@@ -239,7 +259,7 @@ const DHT22_PING_DURATION: Duration = Duration::from_millis(1);
 dhtxx_impl!(
     Dht11,
     default_options: DEFAULT_DHT11_OPTIONS,
-    minimum_read_interval: MINIMUM_DHT11_READ_INTERVAL,
+    min_read_interval: MIN_DHT11_READ_INTERVAL,
     ping_duration: DHT11_PING_DURATION,
     response_type: Dht11Response
 );
@@ -247,7 +267,7 @@ dhtxx_impl!(
 dhtxx_impl!(
     Dht22,
     default_options: DEFAULT_DHT22_OPTIONS,
-    minimum_read_interval: MINIMUM_DHT22_READ_INTERVAL,
+    min_read_interval: MIN_DHT22_READ_INTERVAL,
     ping_duration: DHT22_PING_DURATION,
     response_type: Dht22Response
 );
@@ -309,7 +329,7 @@ where
     async fn read<DelayFn, EmptyFuture, TResponse>(
         &mut self,
         ping_duration: Duration,
-        minimum_read_interval: Duration,
+        min_read_interval: Duration,
         delay_fn: DelayFn,
     ) -> Result<TResponse, Error<TError>>
     where
@@ -323,8 +343,8 @@ where
         }
 
         let elapsed_since_last_read = (self.elapsed_since_fn)(self.last_read_time);
-        if elapsed_since_last_read < minimum_read_interval {
-            let to_wait = minimum_read_interval - elapsed_since_last_read;
+        if elapsed_since_last_read < min_read_interval {
+            let to_wait = min_read_interval - elapsed_since_last_read;
             delay_fn(to_wait).await;
         }
 
@@ -367,7 +387,7 @@ where
         let input_pin: &TInputPin = &mut self.input_pin.as_ref().unwrap();
 
         // Block for the ACK, and use this to estimate a timeout.
-        let ack_counter = match read_ack(input_pin) {
+        let ack_counter = match read_ack(input_pin, &self.time_fn, &self.elapsed_since_fn) {
             Err(err) => {
                 self.swap_to_output_mode()?;
                 return Err(err);
@@ -385,6 +405,13 @@ where
                 Ok(count) => count,
             };
         }
+        let end_ticks = match read_end_with_timeout(input_pin, bit_timeout) {
+            Err(err) => {
+                self.swap_to_output_mode()?;
+                return Err(err);
+            }
+            Ok(count) => count,
+        };
 
         self.swap_to_output_mode()?;
 
@@ -400,7 +427,8 @@ where
         // The last 8 bits should match the parity byte.
         let expected_parity = sum.to_be_bytes()[1];
 
-        if parity != expected_parity {
+        let end_bit = if end_ticks > threshold { 1 } else { 0 };
+        if parity != expected_parity || end_bit == 1 {
             return Err(Error::BadData);
         }
 
@@ -432,29 +460,67 @@ where
     while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
-            return Err(Error::Timeout);
+            return Err(Error::BadData);
         }
     }
     while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
-            return Err(Error::Timeout);
+            return Err(Error::BadData);
         }
     }
     Ok(counter)
 }
 
 #[inline]
-fn read_ack<TInput, TError>(input_pin: &TInput) -> Result<u32, Error<TError>>
+fn read_end_with_timeout<TInput, TError>(
+    input_pin: &TInput,
+    timeout: u32,
+) -> Result<u32, Error<TError>>
 where
     TInput: InputPin<Error = TError>,
 {
+    let mut counter = 0u32;
+    while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
+        counter += 1;
+        if counter > timeout {
+            return Err(Error::BadData);
+        }
+    }
+    Ok(counter)
+}
+
+#[inline]
+fn read_ack<TInput, TError, TimeFn, ElapsedFn, TTime>(
+    input_pin: &TInput,
+    time_fn: TimeFn,
+    elapsed_since_fn: ElapsedFn,
+) -> Result<u32, Error<TError>>
+where
+    TInput: InputPin<Error = TError>,
+    TimeFn: Fn() -> TTime,
+    ElapsedFn: Fn(TTime) -> Duration,
+    TTime: Copy,
+{
+    const TIMEOUT: Duration = Duration::from_millis(2);
+    const WATCHDOG_COUNTS: u32 = 1000;
+    let start_time = time_fn();
     let mut counter: u32 = 0;
     while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
+        if counter % WATCHDOG_COUNTS == 0 {
+            if elapsed_since_fn(start_time) > TIMEOUT {
+                return Err(Error::NoResponse);
+            }
+        }
     }
     while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
+        if counter % WATCHDOG_COUNTS == 0 {
+            if elapsed_since_fn(start_time) > TIMEOUT {
+                return Err(Error::NoResponse);
+            }
+        }
     }
     while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
