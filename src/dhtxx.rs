@@ -19,14 +19,13 @@ impl<TIoError> From<TIoError> for Error<TIoError> {
     }
 }
 
-// TODO: Test responses in detail.
 pub trait Response {
     fn get_humidity(&self) -> f32;
     fn get_temperature(&self) -> f32;
 }
 
 trait ResponseInternal {
-    fn from_raw_bytes(bytes: &[u8; 4]) -> Self;
+    fn from_raw_bytes(bytes: [u8; 4]) -> Self;
     fn is_valid(&self) -> bool;
 }
 
@@ -50,7 +49,7 @@ impl Response for Dht11Response {
 }
 
 impl ResponseInternal for Dht11Response {
-    fn from_raw_bytes(bytes: &[u8; 4]) -> Dht11Response {
+    fn from_raw_bytes(bytes: [u8; 4]) -> Dht11Response {
         Dht11Response {
             humidity: bytes[0],
             humidity_decimal: bytes[1],
@@ -62,10 +61,10 @@ impl ResponseInternal for Dht11Response {
     fn is_valid(&self) -> bool {
         // DHT11 sensors should only be able to read temperatures from 0-50 degrees Celsius.
         // Validate that + 50% for some wiggle-room in case some sensors can go beyond this.
-        (self.humidity < 100 || (self.humidity == 100 && self.humidity_decimal == 0))
-            && self.humidity_decimal < 10
-            && self.temperature < 75
-            && self.temperature_decimal < 10
+        ((self.humidity < 100 && self.humidity_decimal < 10)
+            || (self.humidity == 100 && self.humidity_decimal == 0))
+            && ((self.temperature < 75 && self.temperature_decimal < 10)
+                || (self.temperature == 75 && self.temperature_decimal == 0))
     }
 }
 
@@ -91,7 +90,7 @@ impl Response for Dht22Response {
 }
 
 impl ResponseInternal for Dht22Response {
-    fn from_raw_bytes(bytes: &[u8; 4]) -> Dht22Response {
+    fn from_raw_bytes(bytes: [u8; 4]) -> Dht22Response {
         Dht22Response {
             humidity_x10: ((bytes[0] as u16) << 8) | bytes[1] as u16,
             temperature_x10: ((bytes[2] as u16) << 8) | bytes[3] as u16,
@@ -102,9 +101,9 @@ impl ResponseInternal for Dht22Response {
         // DHT22 sensors should only be able to read temperatures from -40 - 125 degrees Celsius.
         // Validate that + a some wiggle-room in case some sensors can go beyond this.
         let temp_is_negative = self.temperature_x10 & 0x8000 != 0;
-        self.humidity_x10 <= 1000
-            && ((temp_is_negative && (self.temperature_x10 & 0x7FFF) < 600)
-                || (!temp_is_negative && self.temperature_x10 < 1500))
+        let temp_is_valid = (temp_is_negative && (self.temperature_x10 & 0x7FFF) < 601)
+            || (!temp_is_negative && (self.temperature_x10 < 1501));
+        self.humidity_x10 <= 1000 && temp_is_valid
     }
 }
 
@@ -331,7 +330,7 @@ where
 
         self.request_data(ping_duration, delay_fn).await?;
         let bytes = self.receive_data()?;
-        let result = TResponse::from_raw_bytes(&bytes);
+        let result = TResponse::from_raw_bytes(bytes);
         if !result.is_valid() {
             return Err(Error::BadData);
         }
@@ -556,4 +555,181 @@ fn parse_byte(bit_ticks: &[u32], threshold: u32) -> u8 {
         }
     }
     return byte;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! test_is_valid {
+        ($name:ident, $type:ty, $bytes:expr, $is_valid:expr) => {
+            #[test]
+            fn $name() {
+                let response = <$type>::from_raw_bytes($bytes);
+                assert_eq!(response.is_valid(), $is_valid);
+            }
+        };
+    }
+
+    test_is_valid!(
+        dht11_is_valid_upper_bound,
+        Dht11Response,
+        [100, 0, 75, 0],
+        true
+    );
+
+    test_is_valid!(
+        dht11_is_valid_decimal_upper_bound,
+        Dht11Response,
+        [99, 9, 74, 9],
+        true
+    );
+
+    test_is_valid!(
+        dht11_is_valid_lower_bound,
+        Dht11Response,
+        [0, 0, 0, 0],
+        true
+    );
+
+    test_is_valid!(
+        dht11_is_valid_humidity_too_high,
+        Dht11Response,
+        [101, 0, 0, 0],
+        false
+    );
+
+    test_is_valid!(
+        dht11_is_valid_humidity_decimal_too_high,
+        Dht11Response,
+        [100, 1, 0, 0],
+        false
+    );
+
+    test_is_valid!(
+        dht11_is_valid_humidity_decimal_beyond_9,
+        Dht11Response,
+        [50, 10, 0, 0],
+        false
+    );
+
+    test_is_valid!(
+        dht11_is_valid_temperature_too_high,
+        Dht11Response,
+        [0, 0, 76, 0],
+        false
+    );
+
+    test_is_valid!(
+        dht11_is_valid_temperature_decimal_too_high,
+        Dht11Response,
+        [0, 0, 75, 1],
+        false
+    );
+
+    test_is_valid!(
+        dht11_is_valid_temperature_decimal_beyond_9,
+        Dht11Response,
+        [0, 0, 20, 10],
+        false
+    );
+
+    test_is_valid!(
+        dht22_is_valid_upper_bound,
+        Dht22Response,
+        [
+            1000u16.to_be_bytes()[0],
+            1000u16.to_be_bytes()[1],
+            1500u16.to_be_bytes()[0],
+            1500u16.to_be_bytes()[1]
+        ],
+        true
+    );
+
+    test_is_valid!(
+        dht22_is_valid_decimal_upper_bound,
+        Dht22Response,
+        [
+            999u16.to_be_bytes()[0],
+            999u16.to_be_bytes()[1],
+            1499u16.to_be_bytes()[0],
+            1499u16.to_be_bytes()[1]
+        ],
+        true
+    );
+
+    test_is_valid!(
+        dht22_is_valid_lower_bound,
+        Dht22Response,
+        [
+            0,
+            0,
+            600u16.to_be_bytes()[0] | 0x80,
+            600u16.to_be_bytes()[1]
+        ],
+        true
+    );
+
+    test_is_valid!(
+        dht22_is_valid_humidity_too_high,
+        Dht22Response,
+        [1001u16.to_be_bytes()[0], 1001u16.to_be_bytes()[1], 0, 0],
+        false
+    );
+
+    test_is_valid!(
+        dht22_is_valid_temperature_too_low,
+        Dht22Response,
+        [
+            0,
+            0,
+            601u16.to_be_bytes()[0] | 0x80,
+            601u16.to_be_bytes()[1]
+        ],
+        false
+    );
+
+    test_is_valid!(
+        dht22_is_valid_temperature_too_high,
+        Dht22Response,
+        [0, 0, 1501u16.to_be_bytes()[0], 1501u16.to_be_bytes()[1],],
+        false
+    );
+
+    #[test]
+    fn dht11_get_humidity() {
+        let response = Dht11Response::from_raw_bytes([71, 2, 0, 0]);
+        assert_eq!(response.get_humidity(), 71.2);
+    }
+
+    #[test]
+    fn dht11_get_temperature() {
+        let response = Dht11Response::from_raw_bytes([0, 0, 60, 3]);
+        assert_eq!(response.get_temperature(), 60.3);
+    }
+
+    #[test]
+    fn dht22_get_humidity() {
+        let response =
+            Dht22Response::from_raw_bytes([513u16.to_be_bytes()[0], 513u16.to_be_bytes()[1], 0, 0]);
+        assert_eq!(response.get_humidity(), 51.3);
+    }
+
+    #[test]
+    fn dht22_get_temperature() {
+        let response =
+            Dht22Response::from_raw_bytes([0, 0, 413u16.to_be_bytes()[0], 413u16.to_be_bytes()[1]]);
+        assert_eq!(response.get_temperature(), 41.3);
+    }
+
+    #[test]
+    fn dht22_get_temperature_negative() {
+        let response = Dht22Response::from_raw_bytes([
+            0,
+            0,
+            413u16.to_be_bytes()[0] | 0x80,
+            413u16.to_be_bytes()[1],
+        ]);
+        assert_eq!(response.get_temperature(), -41.3);
+    }
 }

@@ -5,9 +5,9 @@ pub const MAX_CLOCK_AT_5V: u32 = 3_600_000;
 /// The maximum SPI clock speed when V<sub>DD</sub> is 2.7V.
 pub const MAX_CLOCK_AT_2_7V: u32 = 1_350_000;
 
-// The number of addressable channels on an MCP3004.
+/// The number of addressable channels on an MCP3004.
 pub const NUM_CHANNELS_MCP3004: u8 = 4;
-// The number of addressable channels on an MCP3008.
+/// The number of addressable channels on an MCP3008.
 pub const NUM_CHANNELS_MCP3008: u8 = 8;
 
 #[derive(Debug, PartialEq)]
