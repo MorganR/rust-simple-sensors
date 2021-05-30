@@ -1,4 +1,4 @@
-use embedded_hal::spi::FullDuplex;
+use embedded_hal::nb::spi::FullDuplex;
 
 mod fake_hal;
 use fake_hal::spi::*;
@@ -13,15 +13,15 @@ fn new_with_more_reads_than_writes_panics() {
 #[should_panic]
 fn too_many_writes_panics() {
     let mut spi = SPI::new(vec![], vec![]);
-    let _ = spi.try_send(0);
+    let _ = spi.send(0);
 }
 
 #[test]
 fn read_synchronous() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![FakeRead::Success(4)], vec![FakeWrite::Success()]);
 
-    spi.try_send(0)?;
-    let result = spi.try_read()?;
+    spi.send(0)?;
+    let result = spi.read()?;
 
     assert_eq!(result, 4);
     Ok(())
@@ -34,11 +34,11 @@ fn read_multiple() -> nb::Result<(), SpiError> {
         vec![FakeWrite::Success(), FakeWrite::Success()],
     );
 
-    spi.try_send(0)?;
-    assert_eq!(spi.try_read()?, 1);
+    spi.send(0)?;
+    assert_eq!(spi.read()?, 1);
 
-    spi.try_send(0)?;
-    assert_eq!(spi.try_read()?, 2);
+    spi.send(0)?;
+    assert_eq!(spi.read()?, 2);
     Ok(())
 }
 
@@ -46,12 +46,12 @@ fn read_multiple() -> nb::Result<(), SpiError> {
 fn read_asynchronous() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![FakeRead::AsyncSuccess(4)], vec![FakeWrite::Success()]);
 
-    spi.try_send(0)?;
-    let result = spi.try_read();
+    spi.send(0)?;
+    let result = spi.read();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::WouldBlock);
 
-    let result = spi.try_read()?;
+    let result = spi.read()?;
     assert_eq!(result, 4);
     Ok(())
 }
@@ -60,8 +60,8 @@ fn read_asynchronous() -> nb::Result<(), SpiError> {
 fn read_error() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![FakeRead::Error()], vec![FakeWrite::Success()]);
 
-    spi.try_send(0)?;
-    let result = spi.try_read();
+    spi.send(0)?;
+    let result = spi.read();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::Other(SpiError()));
     Ok(())
@@ -71,12 +71,12 @@ fn read_error() -> nb::Result<(), SpiError> {
 fn read_error_async() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![FakeRead::AsyncError()], vec![FakeWrite::Success()]);
 
-    spi.try_send(0)?;
-    let result = spi.try_read();
+    spi.send(0)?;
+    let result = spi.read();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::WouldBlock);
 
-    let result = spi.try_read();
+    let result = spi.read();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::Other(SpiError()));
     Ok(())
@@ -86,7 +86,7 @@ fn read_error_async() -> nb::Result<(), SpiError> {
 fn read_no_write_fails() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![FakeRead::Success(4)], vec![FakeWrite::Success()]);
 
-    let result = spi.try_read();
+    let result = spi.read();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::Other(SpiError()));
     Ok(())
@@ -99,9 +99,9 @@ fn read_more_than_write_fails() -> nb::Result<(), SpiError> {
         vec![FakeWrite::Success(), FakeWrite::Success()],
     );
 
-    spi.try_send(0)?;
-    spi.try_read()?;
-    let result = spi.try_read();
+    spi.send(0)?;
+    spi.read()?;
+    let result = spi.read();
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::Other(SpiError()));
     Ok(())
@@ -111,7 +111,7 @@ fn read_more_than_write_fails() -> nb::Result<(), SpiError> {
 fn write_synchronous() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![], vec![FakeWrite::Success()]);
 
-    spi.try_send(4)?;
+    spi.send(4)?;
     assert_eq!(spi.get_written_data(), [4]);
     Ok(())
 }
@@ -120,12 +120,12 @@ fn write_synchronous() -> nb::Result<(), SpiError> {
 fn write_asynchronous() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![], vec![FakeWrite::AsyncSuccess()]);
 
-    let async_result = spi.try_send(4);
+    let async_result = spi.send(4);
     assert!(async_result.is_err());
     assert_eq!(async_result.unwrap_err(), nb::Error::WouldBlock);
     assert_eq!(spi.get_written_data(), []);
 
-    spi.try_send(4)?;
+    spi.send(4)?;
     assert_eq!(spi.get_written_data(), [4]);
     Ok(())
 }
@@ -134,10 +134,10 @@ fn write_asynchronous() -> nb::Result<(), SpiError> {
 fn write_multiple() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![], vec![FakeWrite::Error(), FakeWrite::Success()]);
 
-    let result = spi.try_send(0);
+    let result = spi.send(0);
     assert!(result.is_err());
 
-    let result = spi.try_send(0);
+    let result = spi.send(0);
     assert!(result.is_ok());
     Ok(())
 }
@@ -146,7 +146,7 @@ fn write_multiple() -> nb::Result<(), SpiError> {
 fn write_error() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![], vec![FakeWrite::Error()]);
 
-    let result = spi.try_send(4);
+    let result = spi.send(4);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::Other(SpiError()));
     Ok(())
@@ -156,11 +156,11 @@ fn write_error() -> nb::Result<(), SpiError> {
 fn write_async_error() -> nb::Result<(), SpiError> {
     let mut spi = SPI::new(vec![], vec![FakeWrite::AsyncError()]);
 
-    let result = spi.try_send(4);
+    let result = spi.send(4);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::WouldBlock);
 
-    let result = spi.try_send(4);
+    let result = spi.send(4);
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), nb::Error::Other(SpiError()));
     Ok(())

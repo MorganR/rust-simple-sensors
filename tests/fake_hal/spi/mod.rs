@@ -1,4 +1,4 @@
-use embedded_hal::spi::FullDuplex;
+use embedded_hal::nb::spi::FullDuplex;
 use nb;
 
 #[derive(Debug, PartialEq)]
@@ -55,7 +55,7 @@ impl SPI {
 
 impl FullDuplex<u8> for SPI {
     type Error = SpiError;
-    fn try_read(&mut self) -> nb::Result<u8, SpiError> {
+    fn read(&mut self) -> nb::Result<u8, SpiError> {
         match self.last_complete_op {
             LastOp::FakeWrite => {}
             _ => return Err(nb::Error::Other(SpiError())),
@@ -79,7 +79,7 @@ impl FullDuplex<u8> for SPI {
         Err(nb::Error::Other(SpiError()))
     }
 
-    fn try_send(&mut self, word: u8) -> nb::Result<(), SpiError> {
+    fn send(&mut self, word: u8) -> nb::Result<(), SpiError> {
         if self.current_write.is_none() {
             self.current_write = Some(self.writes.remove(0));
             let write = self.current_write.as_ref().unwrap();

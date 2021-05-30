@@ -1,5 +1,5 @@
 use core::time::Duration;
-use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
+use embedded_hal::blocking::digital::{InputPin, IoPin, OutputPin, PinState};
 
 #[derive(Debug, PartialEq)]
 pub enum Error<TIoError> {
@@ -369,7 +369,7 @@ where
         self.output_pin
             .as_mut()
             .unwrap()
-            .try_set_low()
+            .set_low()
             .map_err(Error::Wrapped)?;
         delay_fn(ping_duration).await;
         Ok(())
@@ -381,7 +381,7 @@ where
             self.output_pin
                 .take()
                 .unwrap()
-                .try_into_input_pin()
+                .into_input_pin()
                 .map_err(Error::Wrapped)?,
         );
         let input_pin: &TInputPin = &mut self.input_pin.as_ref().unwrap();
@@ -440,7 +440,7 @@ where
             self.input_pin
                 .take()
                 .unwrap()
-                .try_into_output_pin(PinState::High)
+                .into_output_pin(PinState::High)
                 .map_err(Error::Wrapped)?,
         );
         self.last_read_time = (self.time_fn)();
@@ -457,13 +457,13 @@ where
     TInput: InputPin<Error = TError>,
 {
     let mut counter = 0u32;
-    while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
+    while input_pin.is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
             return Err(Error::BadData);
         }
     }
-    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
+    while input_pin.is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
             return Err(Error::BadData);
@@ -481,7 +481,7 @@ where
     TInput: InputPin<Error = TError>,
 {
     let mut counter = 0u32;
-    while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
+    while input_pin.is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter > timeout {
             return Err(Error::BadData);
@@ -506,7 +506,7 @@ where
     const WATCHDOG_COUNTS: u32 = 1000;
     let start_time = time_fn();
     let mut counter: u32 = 0;
-    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
+    while input_pin.is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter % WATCHDOG_COUNTS == 0 {
             if elapsed_since_fn(start_time) > TIMEOUT {
@@ -514,7 +514,7 @@ where
             }
         }
     }
-    while input_pin.try_is_low().map_err(|err| Error::Wrapped(err))? {
+    while input_pin.is_low().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
         if counter % WATCHDOG_COUNTS == 0 {
             if elapsed_since_fn(start_time) > TIMEOUT {
@@ -522,7 +522,7 @@ where
             }
         }
     }
-    while input_pin.try_is_high().map_err(|err| Error::Wrapped(err))? {
+    while input_pin.is_high().map_err(|err| Error::Wrapped(err))? {
         counter += 1;
     }
     Ok(counter)

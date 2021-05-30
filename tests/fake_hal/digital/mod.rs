@@ -1,5 +1,5 @@
 use super::concurrent;
-use embedded_hal::digital::{InputPin, IoPin, OutputPin, PinState};
+use embedded_hal::blocking::digital::{InputPin, IoPin, OutputPin, PinState};
 
 #[derive(Debug, PartialEq)]
 pub enum Error {}
@@ -35,7 +35,7 @@ impl Pin {
 impl InputPin for Pin {
     type Error = Error;
 
-    fn try_is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&self) -> Result<bool, Self::Error> {
         if self.data_to_read.is_none() {
             return Ok(self.default_data);
         }
@@ -44,7 +44,7 @@ impl InputPin for Pin {
         Ok(self.data_to_read.as_ref().unwrap()[data_index] > 0)
     }
 
-    fn try_is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&self) -> Result<bool, Self::Error> {
         if self.data_to_read.is_none() {
             return Ok(!self.default_data);
         }
@@ -57,11 +57,11 @@ impl InputPin for Pin {
 impl OutputPin for Pin {
     type Error = Error;
 
-    fn try_set_low(&mut self) -> Result<(), Self::Error> {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
         return Ok(());
     }
 
-    fn try_set_high(&mut self) -> Result<(), Self::Error> {
+    fn set_high(&mut self) -> Result<(), Self::Error> {
         return Ok(());
     }
 }
@@ -69,11 +69,11 @@ impl OutputPin for Pin {
 impl IoPin<Pin, Pin> for Pin {
     type Error = Error;
 
-    fn try_into_input_pin(self) -> Result<Pin, Self::Error> {
+    fn into_input_pin(self) -> Result<Pin, Self::Error> {
         Ok(self)
     }
 
-    fn try_into_output_pin(self, _state: PinState) -> Result<Pin, Self::Error> {
+    fn into_output_pin(self, _state: PinState) -> Result<Pin, Self::Error> {
         Ok(self)
     }
 }

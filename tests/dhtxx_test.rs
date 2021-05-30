@@ -1,5 +1,4 @@
-use simple_sensors::dhtxx;
-use simple_sensors::dhtxx::Response;
+use simple_sensors::dhtxx::{self, Response};
 use std::time::{Duration, Instant};
 
 mod fake_hal;

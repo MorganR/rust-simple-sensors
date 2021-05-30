@@ -157,7 +157,7 @@ where
     //   1/0 - single-ended/differential read
     //   X X X - channel select bits
     let mut tx_buf: [u8; 3] = [0x1, request.to_bits() << 4, 0x0];
-    let rx = spi.try_transfer(&mut tx_buf)?;
+    let rx = spi.transfer(&mut tx_buf)?;
 
     if (rx[1] & 0b100) != 0 {
         // MCP300x sensors should send a null-bit right before the data. If this is missing, then
