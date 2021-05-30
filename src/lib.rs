@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 
 /// Universal drivers for reading from DHT11 or DHT22 sensors.
 ///

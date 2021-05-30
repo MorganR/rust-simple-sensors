@@ -223,29 +223,24 @@ where
         data[i] = byte_and_pin.data;
     }
 
-    println!("Read data:");
-
     let mut x = 0u64;
     let mut shift = 0u8;
-    let mut x_7 = 0u64;
+    // let mut x_7 = 0u64;
     for i in 0..8 {
-        println!("Byte {}: 0b{:8b}", i, data[i]);
         x += (data[i] as u64) << shift;
-        if i == 6 {
-            x_7 = x;
-        }
+        // if i == 6 {
+        //     x_7 = x;
+        // }
         shift += 8;
     }
-    println!("CRC Byte: {}", data[8]);
-    let crc_7 = compute_crc(x_7);
+    // TODO: Confirm correct way to compute CRC.
+    // let crc_7 = compute_crc(x_7);
     let crc = compute_crc(x);
-    println!("7 byte CRC: {}, 8 byte CRC: {}", crc_7, crc);
     if crc != data[8] {
         return Err(Error::BadData);
     }
 
     let temperature = Temperature::from_bytes(data[0], data[1]);
-    // let temperature = Temperature::from_bytes(0, 0);
     Ok(ReadResult {
         data: temperature,
         pin: pin
@@ -534,9 +529,9 @@ where
 
     // Read bit after sample delay.
     let pin: TInPin = pin.into_input_pin().map_err(Error::WrappedIo)?;
-    // delay
-    //     .delay_us(READ_SAMPLE_DELAY_US as u16)
-    //     .map_err(Error::WrappedDelay)?;
+    delay
+        .delay_us(READ_SAMPLE_DELAY_US as u32)
+        .map_err(Error::WrappedDelay)?;
     let result = pin.is_high().map_err(Error::WrappedInput)?;
 
     // Wait for minimum read interval.
