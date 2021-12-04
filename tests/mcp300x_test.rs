@@ -1,10 +1,7 @@
-use embedded_hal::blocking::spi::transfer::Default as DefaultTransfer;
 use simple_sensors::mcp300x;
 
 mod fake_hal;
 use fake_hal::spi as fake_spi;
-
-impl DefaultTransfer<u8> for fake_spi::SPI {}
 
 macro_rules! test_synchronous_read_success {
     ($name:ident, $read_fn:expr, $request:expr) => {

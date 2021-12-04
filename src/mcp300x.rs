@@ -1,4 +1,4 @@
-use embedded_hal::blocking::spi::Transfer;
+use embedded_hal::spi::blocking::TransferInplace;
 
 /// The maximum SPI clock speed when V<sub>DD</sub> is 5V.
 pub const MAX_CLOCK_AT_5V: u32 = 3_600_000;
@@ -126,7 +126,7 @@ macro_rules! mcp_300x_impl {
             spi: &mut TSpi,
         ) -> Result<u16, Error<TIoError>>
         where
-            TSpi: Transfer<u8, Error = TIoError>,
+            TSpi: TransferInplace<u8, Error = TIoError>,
         {
             if $is_arg_invalid(request) {
                 return Err(Error::InvalidArgument);
@@ -147,7 +147,7 @@ mcp_300x_impl!(read_mcp3008, |request| match request {
 
 fn read<TSpi, TIoError>(request: Request, spi: &mut TSpi) -> Result<u16, Error<TIoError>>
 where
-    TSpi: Transfer<u8, Error = TIoError>,
+    TSpi: TransferInplace<u8, Error = TIoError>,
 {
     // Send the request aligned such that it is easy to read data using 8-bit words. See page 21 of
     // https://cdn-shop.adafruit.com/datasheets/MCP3008.pdf.
@@ -157,15 +157,15 @@ where
     //   1/0 - single-ended/differential read
     //   X X X - channel select bits
     let mut tx_buf: [u8; 3] = [0x1, request.to_bits() << 4, 0x0];
-    let rx = spi.transfer(&mut tx_buf)?;
+    spi.transfer_inplace(&mut tx_buf)?;
 
-    if (rx[1] & 0b100) != 0 {
+    if (tx_buf[1] & 0b100) != 0 {
         // MCP300x sensors should send a null-bit right before the data. If this is missing, then
         // this read can't be trusted.
         return Err(Error::BadData);
     }
 
-    Ok((((rx[1] & 0b11) as u16) << 8) + rx[2] as u16)
+    Ok((((tx_buf[1] & 0b11) as u16) << 8) + tx_buf[2] as u16)
 }
 
 #[cfg(test)]

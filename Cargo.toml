@@ -12,9 +12,9 @@ repository = "https://github.com/MorganR/rust-simple-sensors"
 version = "0.1.0"
 
 [dependencies]
-embedded-hal = { path = "../embedded-hal" }
+embedded-hal = "1.0.0-alpha.6"
 
 [dev-dependencies]
 lazy_static = "1.4.0"
 nb = { version = "1.0.0" }
-tokio = { version = "1.4.0", features = ["macros", "rt", "time"] }
+tokio = { version = "1.14.0", features = ["macros", "rt", "time"] }

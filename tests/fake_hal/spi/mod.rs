@@ -1,8 +1,15 @@
-use embedded_hal::nb::spi::FullDuplex;
+use embedded_hal::spi::blocking::TransferInplace;
+use embedded_hal::spi::nb::FullDuplex;
 use nb;
 
 #[derive(Debug, PartialEq)]
 pub struct SpiError();
+
+impl embedded_hal::spi::Error for SpiError {
+    fn kind(&self) -> embedded_hal::spi::ErrorKind {
+        embedded_hal::spi::ErrorKind::Other
+    }
+}
 
 pub enum FakeRead {
     Success(u8),
@@ -53,6 +60,17 @@ impl SPI {
     }
 }
 
+impl TransferInplace<u8> for SPI {
+    type Error = SpiError;
+    fn transfer_inplace(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+        for i in 0..words.len() {
+            nb::block!(self.write(words[i]))?;
+            words[i] = nb::block!(self.read())?;
+        }
+        Ok(())
+    }
+}
+
 impl FullDuplex<u8> for SPI {
     type Error = SpiError;
     fn read(&mut self) -> nb::Result<u8, SpiError> {
@@ -79,7 +97,7 @@ impl FullDuplex<u8> for SPI {
         Err(nb::Error::Other(SpiError()))
     }
 
-    fn send(&mut self, word: u8) -> nb::Result<(), SpiError> {
+    fn write(&mut self, word: u8) -> nb::Result<(), SpiError> {
         if self.current_write.is_none() {
             self.current_write = Some(self.writes.remove(0));
             let write = self.current_write.as_ref().unwrap();

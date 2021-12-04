@@ -1,5 +1,6 @@
 use super::concurrent;
-use embedded_hal::blocking::digital::{InputPin, IoPin, OutputPin, PinState};
+use embedded_hal::digital::PinState;
+use embedded_hal::digital::blocking::{InputPin, IoPin, OutputPin};
 
 #[derive(Debug, PartialEq)]
 pub enum Error {}

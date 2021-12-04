@@ -1,6 +1,7 @@
 use core::time::Duration;
-use embedded_hal::blocking::delay::DelayUs;
-use embedded_hal::blocking::digital::{InputPin, IoPin, OutputPin, PinState};
+use embedded_hal::delay::blocking::DelayUs;
+use embedded_hal::digital::PinState;
+use embedded_hal::digital::blocking::{InputPin, IoPin, OutputPin};
 
 /// The maximum resolution of the sensor when in 12-bit mode.
 pub const MAX_RESOLUTION_F32: f32 = 0.0625;
@@ -205,7 +206,7 @@ where
     TIoPin: IoPin<TInPin, TOutPin, Error = TIoError>,
     TInPin: InputPin<Error = TInError> + IoPin<TInPin, TOutPin, Error = TIoError>,
     TOutPin: OutputPin<Error = TOutError> + IoPin<TInPin, TOutPin, Error = TIoError>,
-    TDelay: DelayUs<u32, Error = TDelayError>,
+    TDelay: DelayUs<Error = TDelayError>,
 {
     let pin = reset(pin, delay)?;
     let mut pin = write_byte(RomCommand::Skip as u8, pin, delay)?;
@@ -364,7 +365,7 @@ where
     TIoPin: IoPin<TInPin, TOutPin, Error = TIoError>,
     TInPin: InputPin<Error = TInError> + IoPin<TInPin, TOutPin, Error = TIoError>,
     TOutPin: OutputPin<Error = TOutError> + IoPin<TInPin, TOutPin, Error = TIoError>,
-    TDelay: DelayUs<u32, Error = TDelayError>,
+    TDelay: DelayUs<Error = TDelayError>,
 {
     // let mut results: std::vec::Vec<bool> = std::vec::Vec::with_capacity(1000);
     // Hold pin low for at least 480us.
@@ -415,7 +416,7 @@ where
     TIoPin: IoPin<TInPin, TOutPin, Error = TIoError>,
     TInPin: InputPin<Error = TInError> + IoPin<TInPin, TOutPin, Error = TIoError>,
     TOutPin: OutputPin<Error = TOutError> + IoPin<TInPin, TOutPin, Error = TIoError>,
-    TDelay: DelayUs<u32, Error = TDelayError>,
+    TDelay: DelayUs<Error = TDelayError>,
 {
     let mut byte = byte;
     let mut out_pin: TOutPin = pin
@@ -439,7 +440,7 @@ where
     TIoPin: IoPin<TInPin, TOutPin, Error = TIoError>,
     TInPin: InputPin<Error = TInError> + IoPin<TInPin, TOutPin, Error = TIoError>,
     TOutPin: OutputPin<Error = TOutError> + IoPin<TInPin, TOutPin, Error = TIoError>,
-    TDelay: DelayUs<u32, Error = TDelayError>,
+    TDelay: DelayUs<Error = TDelayError>,
 {
     let mut byte = 0u8;
     let mut out_pin = pin
@@ -468,7 +469,7 @@ where
     TIoPin: IoPin<TInPin, TOutPin, Error = TIoError>,
     TInPin: InputPin<Error = TInError> + IoPin<TInPin, TOutPin, Error = TIoError>,
     TOutPin: OutputPin<Error = TOutError> + IoPin<TInPin, TOutPin, Error = TIoError>,
-    TDelay: DelayUs<u32, Error = TDelayError>,
+    TDelay: DelayUs<Error = TDelayError>,
 {
     // Ensure we wait for recovery period between reads/writes.
     let mut pin: TOutPin = pin
@@ -510,7 +511,7 @@ where
     TIoPin: IoPin<TInPin, TOutPin, Error = TIoError>,
     TInPin: InputPin<Error = TInError> + IoPin<TInPin, TOutPin, Error = TIoError>,
     TOutPin: OutputPin<Error = TOutError> + IoPin<TInPin, TOutPin, Error = TIoError>,
-    TDelay: DelayUs<u32, Error = TDelayError>,
+    TDelay: DelayUs<Error = TDelayError>,
 {
     // Ensure we wait for recovery period between reads/writes.
     let mut pin: TOutPin = pin
